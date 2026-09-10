@@ -1,0 +1,121 @@
+version: '3.8'
+
+services:
+  # 1. PostgreSQL 16 Database with Double-Entry Ledger
+  postgres:
+    image: postgres:16-alpine
+    container_name: vaultguard-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: vaultguard_db
+      POSTGRES_USER: vaultguard_admin
+      POSTGRES_PASSWORD: vaultguard_secure_password_2026
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/01_init.sql
+      - ./database/seed.sql:/docker-entrypoint-initdb.d/02_seed.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vaultguard_admin -d vaultguard_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # 2. Redis In-Memory Cache & Pub/Sub Bus
+  redis:
+    image: redis:7-alpine
+    container_name: vaultguard-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # 3. Golang Payment Core Microservice
+  core-go:
+    build:
+      context: ./services/core-go
+      dockerfile: Dockerfile
+    container_name: vaultguard-core-go
+    restart: unless-stopped
+    environment:
+      PORT: 8080
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      FRAUD_SERVICE_URL: http://fraud-python:8000
+    ports:
+      - "8080:8080"
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+
+  # 4. Python FastAPI AI Fraud Detection Engine
+  fraud-python:
+    build:
+      context: ./services/fraud-python
+      dockerfile: Dockerfile
+    container_name: vaultguard-fraud-python
+    restart: unless-stopped
+    environment:
+      PORT: 8000
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    ports:
+      - "8000:8000"
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  # 5. Node.js WebSocket & Real-Time Gateway
+  gateway-node:
+    build:
+      context: ./services/gateway-node
+      dockerfile: Dockerfile
+    container_name: vaultguard-gateway-node
+    restart: unless-stopped
+    environment:
+      PORT: 5000
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    ports:
+      - "5000:5000"
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  # 6. React Web Dashboard (Risk Ops War Room)
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+    container_name: vaultguard-web
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+
+  # 7. Nginx Edge Reverse Proxy & API Gateway
+  nginx:
+    image: nginx:alpine
+    container_name: vaultguard-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - core-go
+      - fraud-python
+      - gateway-node
+      - web
+
+volumes:
+  postgres_data:
+  redis_data:

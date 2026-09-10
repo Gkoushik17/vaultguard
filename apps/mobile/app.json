@@ -1,0 +1,26 @@
+{
+  "expo": {
+    "name": "VaultGuard Wallet",
+    "slug": "vaultguard-wallet",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "backgroundColor": "#090f1d"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.vaultguard.wallet"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#090f1d"
+      },
+      "package": "com.vaultguard.wallet"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
+  }
+}

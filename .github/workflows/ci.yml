@@ -1,0 +1,70 @@
+name: VaultGuard CI/CD Pipeline
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+
+jobs:
+  python-test:
+    name: Python AI Engine Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - name: Install dependencies
+        run: |
+          cd services/fraud-python
+          pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Run PyTest
+        run: |
+          cd services/fraud-python
+          pytest -v tests/
+
+  go-verify:
+    name: Go Payment Core Build & Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Go 1.22
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+      - name: Verify Go Dependencies & Build
+        run: |
+          cd services/core-go
+          go mod tidy
+          go build -v ./cmd/server/main.go
+
+  node-and-react-build:
+    name: Node Gateway & React Web Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Build Node Gateway
+        run: |
+          cd services/gateway-node
+          npm install
+          npm run build
+      - name: Build React Web Operations Portal
+        run: |
+          cd apps/web
+          npm install
+          npm run build
+
+  docker-lint:
+    name: Docker Compose Config Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Docker Compose
+        run: docker compose config
